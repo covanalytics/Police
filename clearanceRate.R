@@ -1,14 +1,14 @@
 
 setwd("U:/CityWide Performance/Police/Part I & Part II/ClearanceRates")
 
-library("xlsx", lib.loc="~/R/win-library/3.2")
-library("plyr", lib.loc="~/R/win-library/3.2")
-library("dplyr", lib.loc="~/R/win-library/3.2")
-library("tidyr", lib.loc="~/R/win-library/3.2")
-library("reshape", lib.loc="~/R/win-library/3.2.5")
-library("reshape2", lib.loc="~/R/win-library/3.2.5")
-library("stringr", lib.loc="~/R/win-library/3.2")
-library("zoo", lib.loc="~/R/win-library/3.2")
+library("xlsx")
+library("plyr")
+library("dplyr")
+library("tidyr")
+library("reshape")
+library("reshape2")
+library("stringr")
+library("zoo")
 library("RSQLite")
 
 #####  CLEARANCE RATES ######
