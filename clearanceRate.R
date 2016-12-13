@@ -202,8 +202,6 @@ September16$Month <- "September"
 September16$Year <- "2016"
 September16$Date <- "09/30/2016"
 
-
-
 ##Bind data frames together
 combined <- do.call("rbind", list(January15, February15, March15, April15, May15, June15, July15,August15,September15, October15, November15, 
                                   December15, January16, February16, March16, April16,
@@ -223,9 +221,6 @@ October16 <- October16[c("C_rate", "Count", "Charge", "Charge.Code")]
 October16$Month <- "October"
 October16$Year <- "2016"
 October16$Date <- "10/31/2016"
-
-
-
 
 November16  <-  read.csv(file="NEWFormat_November16.csv", header=FALSE, na.strings = "NA", stringsAsFactors = FALSE)
 November16 <- data.frame(November16, ind=rep(1:2, nrow(November16)/2))
