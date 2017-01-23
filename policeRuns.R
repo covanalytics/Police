@@ -362,26 +362,6 @@ write.csv(police.map, "U:/OpenGov/Unique Reports/Police/Total Runs/OpenGov Map/L
 ##############################################################################################################################
 ##############################################################################################################################
 ##############################################################################################################################
-#police.runs <- police.runs$Address[!grepl("POLICE MEMORIAL DR", police.runs$Address)]
-
-police.runs <- police.runs %>%
-    subset(Address != "1 POLICE MEMORIAL")%>%
-    subset(Address != "1 POLICE MEMORIAL DR")%>%
-    subset(Address != "1 POLICE MEMORIAL DR - Apt.1")%>%
-    subset(Address != "1 POLICE MEMORIAL DR - Apt. 1")%>%
-    subset(Address != "1 POLICE MEMORIAL DR - Apt. DR")%>%
-    subset(Address != "1 POLICE MEMORIAL DR - Apt. FL 1")%>%
-    subset(Address != "1 POLICE MEMORIAL DR - Apt. GR")%>%
-    subset(Address != "1 POLICE MEMORIAL DR - Apt. p")%>%
-    subset(Address != "1 POLICE MEMORIAL DR - Apt. PUBL")%>%
-    subset(Address != "1 POLICE MEMORIAL DR - Apt. s")%>%
-    subset(Address != "POLICE MEMORIAL DR")%>%
-    subset(Category != "do not include")
-
-police.runs$Station <- ifelse(grepl("POLICE", police.runs$Address), "Police Station", "Not Police Station")
-
-police.runs <- subset(police.runs, Station != "Police Station")
-police.runs$Station <- NULL
 
 
 ###Assign to "Crimes Against Persons"
