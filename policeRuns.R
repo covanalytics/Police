@@ -4,7 +4,7 @@
 
 
 
-setwd("U:/OpenGov/Unique Reports/Police/Total Runs")
+setwd("U:/CityWide Performance/CovStat/CovStat Projects/Police/Runs/Total Runs")
 
 library("xlsx")
 library("plyr")
@@ -15,27 +15,30 @@ library("magrittr")
 library("gmodels")
 library("descr")
 library("zoo")
-library("RSQLite")
+library("arcgisbinding")
+library("sp")
+library("spdep")
+library("rgdal")
+library("maptools")
+library("ggmap")
 
 #Read the contents of the worksheet into a data.frame for the current update
-police.runs  <- read.csv("RUNS_REVISED.csv", header=TRUE,  stringsAsFactors = FALSE)
-police.runs$Count <- 1
-##Split Date and Time into separate columns
-#police.runs <- cSplit(police.runs, "CreateDateTime", sep = " ", type.convert = character)
+police.runs  <- read.csv("MONTHLY_UPDATE.csv",  header=TRUE,  stringsAsFactors = FALSE)
 
-#police.runs$CreateDateTime_3 <- NULL
+## Add some data for the update and format dates
+police.runs <- within(police.runs, {
+  Year <- '2017'
+  Count <- 1
+  CreateDateTime <- strptime(CreateDateTime, format = "%m/%d/%Y %H:%M")
+  
+})
 
 ##Edit names of columns
 names(police.runs) <- c("IncidentNumber", "Date", "Incident.Type", "Address", "Lat", "Long", "Year",  "Count")
 
 police.runs <- police.runs[order(police.runs$Incident.Type),]
 
-
-#Load the calls for service call type key
-#CFS_KEY <- read.csv("CFSKEY.csv", header = TRUE, stringsAsFactors = FALSE)
-
-
-#Change new names to old
+#Change new names format to old format
 change_names <- function(a = police.runs$Incident.Type){
   a[a == "Abandoned Vehicle-OTP"] <- "Abandoned Vehicle - OTP"
   a[a == "Accident-Hit Skip"] <- "Accident - Hit Skip"
@@ -92,204 +95,48 @@ change_names <- function(a = police.runs$Incident.Type){
   
   return(a)
 }
-
-#Speed up assignment in future
-#Create an object and store the data frame vector that contains the calls for service call type key
-#CFS <- CFS_KEY$Type
-
-#create an object and store a condition that tests if each call type in the record file is
-#matches the calls for service in the key
-#cfs <- police.runs$Incident.Type %in% CFS
-
-#Create a new column that assigns "Calls for Service" to each row where the call type matches the key
-#police.runs$Category[cfs] <- "Calls for Service"
-
-
-
 #call function to change new names and check spelling
 police.runs$Incident.Type <- change_names()
-name_check <- for(col in 3)
-  print(unique(sort(police.runs[,col])))
+for(col in 3){
+  name_check <- unique(sort(police.runs[,col]))}
 
-###Police Knowledge Codes
-####Calls for Service####
-police.runs <- within(police.runs, {
-  Category <- NA
-  Category [Incident.Type == "911 Disconnect"] <- "Calls for Service"
-  Category [Incident.Type == "911 Open Line"] <- "Calls for Service"
-  Category [Incident.Type == "911 Open Line Trouble"] <- "Calls for Service"
-  Category [Incident.Type == "Abandoned Vehicle - OTP"] <- "Calls for Service"
-  Category [Incident.Type == "Abandoned Vehicle-OTP"] <- "Calls for Service"
-  Category [Incident.Type == "Accident - Boat"] <- "Calls for Service"
-  Category [Incident.Type == "Accident-Boat"] <- "Calls for Service"
-  Category [Incident.Type == "Accident - Hit Skip"] <- "Calls for Service"
-  Category [Incident.Type == "Accident - No Injuries"] <- "Calls for Service"
-  Category [Incident.Type == "Accident-No Injuries"] <- "Calls for Service"
-  Category [Incident.Type == "Accident - Train Wreck"] <- "Calls for Service"
-  Category [Incident.Type == "Accident-Train Wreck"] <- "Calls for Service"
-  Category [Incident.Type == "Accident - w / Injuries"] <- "Calls for Service"
-  Category [Incident.Type == "Airplane Crash"] <- "Calls for Service"
-  Category [Incident.Type == "Alarm - Audible"] <- "Calls for Service"
-  Category [Incident.Type == "Alarm - Hold Up"] <- "Calls for Service"
-  Category [Incident.Type == "Alarm - Intrusion"] <- "Calls for Service"
-  Category [Incident.Type == "Alarm - Panic"] <- "Calls for Service"
-  Category [Incident.Type == "All Other Offense"] <- "Calls for Service"
-  Category [Incident.Type == "Animal - Bite/Attack"] <- "Calls for Service"
-  Category [Incident.Type == "Animal - Complaint"] <- "Calls for Service"
-  Category [Incident.Type == "Animal - Vicious"] <- "Calls for Service"
-  Category [Incident.Type == "Animal AC Call"] <- "Calls for Service"
-  Category [Incident.Type == "Arson"] <- "Calls for Service"
-  Category [Incident.Type == "Assault"] <- "Calls for Service"
-  Category [Incident.Type == "Assault - w / injuries"] <- "Calls for Service"
-  Category [Incident.Type == "Assist - Fire"] <- "Calls for Service"
-  Category [Incident.Type == "Assist - Other Agency"] <- "Calls for Service"
-  Category [Incident.Type == "Child Found"] <- "Calls for Service"
-  Category [Incident.Type == "Assist - Police"] <- "Calls for Service"
-  Category [Incident.Type == "Boat - Adrift / Abandoned"] <- "Calls for Service"
-  Category [Incident.Type == "Bomb Threat"] <- "Calls for Service"
-  Category [Incident.Type == "Burglary"] <- "Calls for Service"
-  Category [Incident.Type == "Child Abuse"] <- "Calls for Service"
-  Category [Incident.Type == "Criminal Mischief"] <- "Calls for Service"
-  Category [Incident.Type == "Custodial Interference"] <- "Calls for Service"
-  Category [Incident.Type == "Damage to Property"] <- "Calls for Service"
-  Category [Incident.Type == "Death Investigation"] <- "Calls for Service"
-  Category [Incident.Type == "Disorderly Conduct"] <- "Calls for Service"
-  Category [Incident.Type == "Dispute - Active"] <- "Calls for Service"
-  Category [Incident.Type == "Dispute - Inactive"] <- "Calls for Service"
-  Category [Incident.Type == "Domestic Trouble"] <- "Calls for Service"
-  Category [Incident.Type == "Drowning"] <- "Calls for Service"
-  Category [Incident.Type == "Drug Activity"] <- "Calls for Service"
-  Category [Incident.Type == "Drunk Driver / DUI"] <- "Calls for Service"
-  Category [Incident.Type == "Emotional Crisis"] <- "Calls for Service"
-  Category [Incident.Type == "Intoxicated Driver"] <- "Calls for Service"
-  Category [Incident.Type == "Fight"] <- "Calls for Service"
-  Category [Incident.Type == "Fire - Alarm"] <- "Calls for Service"
-  Category [Incident.Type == "Fire - Investigation"] <- "Calls for Service"
-  Category [Incident.Type == "Fireworks Complaint"] <- "Calls for Service"
-  Category [Incident.Type == "Forgery"] <- "Calls for Service"
-  Category [Incident.Type == "Fraud"] <- "Calls for Service"
-  Category [Incident.Type == "Gambling"] <- "Calls for Service"
-  Category [Incident.Type == "Gun - Subject w/"] <- "Calls for Service"
-  Category [Incident.Type == "Harrassment / Stalking"] <- "Calls for Service"
-  Category [Incident.Type == "Incident Report"] <- "Calls for Service"
-  Category [Incident.Type == "Indecent Exposure"] <- "Calls for Service"
-  Category [Incident.Type == "Intoxicated Person"] <- "Calls for Service"
-  Category [Incident.Type == "Lockout Veh/Res"] <- "Calls for Service"
-  Category [Incident.Type == "Juvenile"] <- "Calls for Service"
-  Category [Incident.Type == "Kidnapping/False Imprisonment"] <- "Calls for Service"
-  Category [Incident.Type == "Loud / Disorderly Subjects"] <- "Calls for Service"
-  Category [Incident.Type == "Loud Music / Noise Complaint"] <- "Calls for Service"
-  Category [Incident.Type == "Missing Person / Runaway"] <- "Calls for Service"
-  Category [Incident.Type == "Motorist Assist"] <- "Calls for Service"
-  Category [Incident.Type == "Notification"] <- "Calls for Service"
-  Category [Incident.Type == "Open Door/Window"] <- "Calls for Service"
-  Category [Incident.Type == "Ordinance Violation"] <- "Calls for Service"
-  Category [Incident.Type == "Other / Unknown (Police)"] <- "Calls for Service"
-  Category [Incident.Type == "Other / Unkown (Police)"] <- "Calls for Service"
-  Category [Incident.Type == "Overdose / Drug"] <- "Calls for Service"
-  Category [Incident.Type == "Overdose / Medication"] <- "Calls for Service"
-  Category [Incident.Type == "Panhandling"] <- "Calls for Service"
-  Category [Incident.Type == "Parking Complaint"] <- "Calls for Service"
-  Category [Incident.Type == "Property - Lost/Found/Assist"] <- "Calls for Service"
-  Category [Incident.Type == "Prostitution"] <- "Calls for Service"
-  Category [Incident.Type == "Prowler"] <- "Calls for Service"
-  Category [Incident.Type == "Rape / Sexual Assault"] <- "Calls for Service"
-  Category [Incident.Type == "Robbery"] <- "Calls for Service"
-  Category [Incident.Type == "Sex Offense"] <- "Calls for Service"
-  Category [Incident.Type == "Shooting / Gunshot Wound"] <- "Calls for Service"
-  Category [Incident.Type == "Shoplifting"] <- "Calls for Service"
-  Category [Incident.Type == "Shots Fired"] <- "Calls for Service"
-  Category [Incident.Type == "Speeding / Reckless Vehicle"] <- "Calls for Service"
-  Category [Incident.Type == "Stabbing"] <- "Calls for Service"
-  Category [Incident.Type == "Suspicious Activity"] <- "Calls for Service"
-  Category [Incident.Type == "Suspicious Person"] <- "Calls for Service"
-  Category [Incident.Type == "Suspicious Person/Vehicle"] <- "Calls for Service"
-  Category [Incident.Type == "SWAT Callout"] <- "Calls for Service"
-  Category [Incident.Type == "Theft"] <- "Calls for Service"
-  Category [Incident.Type == "Theft - From a Motor Vehicle"] <- "Calls for Service"
-  Category [Incident.Type == "Theft - Motor Vehicle"] <- "Calls for Service"
-  Category [Incident.Type == "Traffic Complaint/ Investigation"] <- "Calls for Service"
-  Category [Incident.Type == "Traffic Obstruction"] <- "Calls for Service"
-  Category [Incident.Type == "Trespass"] <- "Calls for Service"
-  Category [Incident.Type == "Trouble"] <- "Calls for Service"
-  Category [Incident.Type == "Trouble - Employee / Customer"] <- "Calls for Service"
-  Category [Incident.Type == "Trouble - Juvenile"] <- "Calls for Service"
-  Category [Incident.Type == "Trouble - Landlord / Tennant"] <- "Calls for Service"
-  Category [Incident.Type == "Trouble - Neighbors"] <- "Calls for Service"
-  Category [Incident.Type == "Trouble - Refusing to Leave"] <- "Calls for Service"
-  Category [Incident.Type == "Vehicle Fire"] <- "Calls for Service"
-  Category [Incident.Type == "Warrant - Arrest"] <- "Calls for Service"
-  Category [Incident.Type == "Weapon - Subject w/"] <- "Calls for Service"
-  Category [Incident.Type == "Well Being Check"] <- "Calls for Service"
-  Category [Incident.Type == "Wires Down"] <- "Calls for Service"})
+#Load the call type keys
+KEY_CFS <- read.csv("CFS_KEY_2_1_17.csv", header = TRUE)
+KEY_OfficierInitiated <- read.csv("OfficerInitiated_KEY_2_1_17.csv")
+KEY_PublicAssistance <- read.csv("PublicAssistance_KEY_2_1_17.csv", header = TRUE)
+KEY_SpecialDetail <- read.csv("SpecialDetail_KEY_2_1_17.csv", header = TRUE)
+KEY_DNInclude <- read.csv("DNInclude_KEY_2_1_17.csv", header = TRUE)
 
-####do not include####
-police.runs <- within(police.runs,{
-  Category [Incident.Type == "Administrative"] <- "do not include"
-  Category [Incident.Type == "AFIS"] <- "do not include"
-  Category [Incident.Type == "Imported Report"] <- "do not include"
-  Category [Incident.Type == "Mobil Forensice"] <- "do not include"
-  Category [Incident.Type == "Training"] <- "do not include"
-  Category [Incident.Type == "TX"] <- "do not include"
-  Category [Incident.Type == "TXAC"] <- "do not include"
-  Category [Incident.Type == "TXSO"] <- "do not include"
-  Category [Incident.Type == "Vehicle Service"] <- "do not include"
-  Category [Incident.Type == "New Call"] <- "do not include"
-  Category [Incident.Type == "Broken/Fractured Bone"] <- "do not include"
-  Category [Incident.Type == "EPO Service"] <- "do not include"
-  Category [Incident.Type == "SRO/Detail/Home Visit"] <- "do not include"
-  Category [Incident.Type == "Eviction/Court Order"] <- "do not include"
-  Category [Incident.Type == "SO Transport"] <- "do not include"
-  Category [Incident.Type == "Fire - Alarm"] <- "do not include"
-  Category [Incident.Type == "Water"] <- "do not include"
-  Category [Incident.Type == "Ill/Non-Specific"] <- "do not include"})
+### Function to assign call types ##
+call_type <- function(x = police.runs$Category){
+  
+  #Create objects and store the data frame vector that contains the call type keys
+  CFS <- KEY_CFS$x
+  officer <- KEY_OfficierInitiated$x
+  public_assistance <- KEY_PublicAssistance$x
+  SpDetail <- KEY_SpecialDetail$x
+  DNInclude <- KEY_DNInclude$x
+  
+  #create an object and store a condition that tests if each call type in the police.runs file
+  #matches the call type in the key
+  match_cfs <- police.runs$Incident.Type %in% CFS
+  match_officer <- police.runs$Incident.Type %in% officer
+  match_publicAssistance <- police.runs$Incident.Type %in% public_assistance
+  match_SpDetail <- police.runs$Incident.Type %in% SpDetail
+  match_DINclude <- police.runs$Incident.Type %in% DNInclude
+  
+  #Create a new column that assigns a category designation to each row where the call type matches the key
+  x[match_cfs] <- "Calls for Service"
+  x[match_officer] <- "Officier Initiated"
+  x[match_publicAssistance] <- "Public Assistance"
+  x[match_SpDetail] <- "Special Detail"
+  x[match_DINclude] <- "do not include"
+  
+  return(x)
+}
+police.runs$Category <- call_type()
 
-###Officer Initiated####
-police.runs <- within(police.runs,{
-  Category [Incident.Type == "Bar Check"] <- "Officier Initiated"
-  Category [Incident.Type == "Drug Investigation"] <- "Officier Initiated"
-  Category [Incident.Type == "Follow Up"] <- "Officier Initiated"
-  Category [Incident.Type == "Foot Patrol"] <- "Officier Initiated"
-  Category [Incident.Type == "Investigation / Follow-Up"] <- "Officier Initiated"
-  Category [Incident.Type == "Officer Initiated"] <- "Officier Initiated"
-  Category [Incident.Type == "Police Services"] <- "Officier Initiated"
-  Category [Incident.Type == "Public Contact / Complaint"] <- "Officier Initiated"
-  Category [Incident.Type == "Public Contact/Complaint"] <- "Officier Initiated"
-  Category [Incident.Type == "Pursuit"] <- "Officier Initiated"
-  Category [Incident.Type == "Routine Investigation"] <- "Officier Initiated"
-  Category [Incident.Type == "Special Area Check"] <- "Officier Initiated"
-  Category [Incident.Type == "Special Investigation"] <- "Officier Initiated"
-  Category [Incident.Type == "Traffic Stop"] <- "Officier Initiated"
-  Category [Incident.Type == "TS"] <- "Officier Initiated"
-  Category [Incident.Type == "Warrant - Search"] <- "Officier Initiated"})
-
-###Public Assistance####
-police.runs <- within(police.runs, {
-  Category [Incident.Type == "ATL"] <- "Public Assistance"
-  Category [Incident.Type == "Broken / Fractured Bone"] <- "Public Assistance"
-  Category [Incident.Type == "Crossing Guard"] <- "Public Assistance"
-  Category [Incident.Type == "EPO Service"] <- "Public Assistance"
-  Category [Incident.Type == "Eviction / Court Order"] <- "Public Assistance"
-  Category [Incident.Type == "Eviction Service"] <- "Public Assistance"
-  Category [Incident.Type == "Fire - Structure Fire"] <- "Public Assistance"
-  Category [Incident.Type == "Fire-Structure Fire"] <- "Public Assistance"
-  Category [Incident.Type == "General Relay"] <- "Public Assistance"
-  Category [Incident.Type == "ill/Non-Specific"] <- "Public Assistance"
-  Category [Incident.Type == "Medical Call"] <- "Public Assistance"
-  Category [Incident.Type == "Mentally Ill"] <- "Public Assistance"
-  Category [Incident.Type == "Paper Process"] <- "Public Assistance"
-  Category [Incident.Type == "Public Assist"] <- "Public Assistance"
-  Category [Incident.Type == "Repo/PP Tow"] <- "Public Assistance"
-  Category [Incident.Type == "See Complainant"] <- "Public Assistance"
-  Category [Incident.Type == "Sick/Injured Person"] <- "Public Assistance"
-  Category [Incident.Type == "SO Transport"] <- "Public Assistance"
-  Category [Incident.Type == "SRO / Detail / Home Visit"] <- "Public Assistance"
-  Category [Incident.Type == "Traffic Control"] <- "Public Assistance"
-  Category [Incident.Type == "Transport"] <- "Public Assistance"
-  Category [Incident.Type == "Vacation / Business Check"] <- "Public Assistance"})
-
-
-###Spell out acronyms
+###Spell out acronyms for incidents
 police.runs$Incident.Type[police.runs$Incident.Type == "TS"] <- "Traffic Stop"
 police.runs$Incident.Type <- sub("^ATL$", "Attempt to Locate", police.runs$Incident.Type)
 police.runs$Incident.Type <- sub("^SRO$", "School Resource Officer", police.runs$Incident.Type)
@@ -301,41 +148,57 @@ police.runs$GunReported <- ifelse(grepl("Gun", police.runs$Incident.Type),"Gun R
                            ifelse(grepl("Shooting", police.runs$Incident.Type),"Gun Reported", 
                            ifelse(grepl("Shots", police.runs$Incident.Type),"Gun Reported", "No Gun Reported"))) 
 
-##Special Detail
-police.runs$Category[police.runs$Incident.Type == "Special Detail"] <- "Special Detail"
+#########################################
+## do not include administrative calls ##
+#########################################
 police.runs <- subset(police.runs,  Category != "do not include")
+
+#############################################
+####Neighborhood Assignment Current Update###
+#############################################
+write.csv(police.runs, file="C:/Users/tsink/Mapping/Geocoding/Police/PoliceUpdates.csv", row.names = FALSE)
+
+#####################
+##Connect to ArcGIS##
+#####################
+
+#### Initialize arcgisbinding ####
+arc.check_product()
+
+#### Read GIS Features ####
+readGIS<- arc.open("C:/Users/tsink/Mapping/Geocoding/Police/RunsNeighborhoods_Sectors.shp")
+
+#### Create Data.Frame ####
+policeGIS <- arc.select(readGIS)
+
+#bind hidden lat/long coordinates back to data frame
+#shape <- arc.shape(policeGIS)
+#policeGIS<- data.frame(policeGIS, long=shape$x, lat=shape$y)
+
+policeGIS <- policeGIS[, c(-1:-2, -14:-17, -19:-31, -34:-36)] 
+names(policeGIS) <- c("Field1", "IncidentNu", "Date", "Incident Type", "Address", "Lat", "Long",
+                      "Year", "Count", "Category", "GunReported", "NbhdLabel", "ID_1", "BEAT")
+
+#########################
+####  SQLite storage ####
+#########################
+library("RSQLite")
+cons.police <- dbConnect(drv=RSQLite::SQLite(), dbname="O:/AllUsers/CovStat/Data Portal/repository/Data/Database Files/Police.db")
+dbWriteTable(cons.police, "PoliceRuns", policeGIS, overwrite = TRUE)
+dbDisconnect(cons.police)
 
 ###CovStat Repository####
 write.csv(police.runs, file="O:/AllUsers/CovStat/Data Portal/Repository/Data/Police/Police Runs.csv")
-#pcalls <- aggregate(Count ~ Category + Year, police.runs, sum)
-#write.csv(police.runs, "pcalls.csv")
 
-#########################
-###   SQLite storage ####
-#########################
-police.runs <- read.csv("TOTAL_CSV.csv", header=TRUE,  stringsAsFactors = FALSE)##file with spatial data(neighborhoods)
 
-police <- dbDriver("SQLite")
-policeRuns <- police.runs
-policeRuns <- as.data.frame(policeRuns)
-cons.police <- dbConnect(police, dbname="O:/AllUsers/CovStat/Data Portal/repository/Data/Database Files/Police.db")
-dbWriteTable(cons.police, "PoliceRuns", policeRuns, overwrite = TRUE)
-dbDisconnect(cons.police)
 
-###################################
-####For Geocoding Current Update###
-###################################
-##Don't forget to change the date field to date in EXCEL before loading in ArcGIS.  Otherwise, AM/PM is cut off.
-police.runsDec <- police.runs
-police.runs16 <- subset(police.runs, Year == 2016)
-police.runs15 <- subset(police.runs, Year == 2015)
-police.runs14 <- subset(police.runs, Year == 2014)
-police.runs13 <- subset(police.runs, Year == 2013)
-write.csv(police.runs, file="C:/Users/tsink/Mapping/Geocoding/Police/PoliceRunsRevised.csv", row.names = FALSE)
-
+## Load from SQLite -----------------
+alltables <- dbListTables(cons.police)
+police_history <- dbGetQuery(cons.police, 'select * from PoliceRuns')
+police_history <- strptime(police_history$Date, format = "%m/%d/%Y %I:%M %p")
 
 #########################################################
-##Reload and output for OpenGov Map shwoing repat calls##
+##Reload and output for OpenGov Map showing repat calls##
 #########################################################
 police.map <- police.runs
 #police.map$Date <- gsub(" \\d*[[:punct:]]*\\d*", "", police.map$Date)
@@ -477,12 +340,6 @@ police.runs <- within(police.runs, {
                                                                           
 ###Assign to "Assisting the Public"
 police.runs$Incident.Group[police.runs$Category=="Public Assistance"] <- "Assisting the Public"
-
-
-
-
-
-
 
 
 
