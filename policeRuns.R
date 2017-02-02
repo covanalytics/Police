@@ -187,15 +187,18 @@ cons.police <- dbConnect(drv=RSQLite::SQLite(), dbname="O:/AllUsers/CovStat/Data
 dbWriteTable(cons.police, "PoliceRuns", policeGIS, overwrite = TRUE)
 dbDisconnect(cons.police)
 
-###CovStat Repository####
-write.csv(police.runs, file="O:/AllUsers/CovStat/Data Portal/Repository/Data/Police/Police Runs.csv")
+### CovStat Repository ---------------------------
+write.csv(policeGIS, file="O:/AllUsers/CovStat/Data Portal/Repository/Data/Police/Police Runs.csv")
+
+## Tableau Dashboard -----------------------------
+dash_runs <- subset(policeGIS, Year != 2013)
+write.csv(dash_runs, "U:/CityWide Performance/CovStat/CovStat Projects/Police/Tableau Files/PoliceRuns.csv")
 
 
-
-## Load from SQLite -----------------
-alltables <- dbListTables(cons.police)
-police_history <- dbGetQuery(cons.police, 'select * from PoliceRuns')
-police_history <- strptime(police_history$Date, format = "%m/%d/%Y %I:%M %p")
+## Load from SQLite ------------------------------
+#alltables <- dbListTables(cons.police)
+#police_history <- dbGetQuery(cons.police, 'select * from PoliceRuns')
+#police_history <- strptime(police_history$Date, format = "%m/%d/%Y %I:%M %p")
 
 #########################################################
 ##Reload and output for OpenGov Map showing repat calls##
