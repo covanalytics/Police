@@ -1,5 +1,5 @@
 
-setwd("U:/CityWide Performance/Police/Part I & Part II/ClearanceRates")
+setwd("U:/CityWide Performance/CovStat/CovStat Projects/Police/Part I & Part II/ClearanceRates")
 
 library("xlsx")
 library("plyr")
@@ -11,7 +11,56 @@ library("stringr")
 library("zoo")
 library("RSQLite")
 
-#####  CLEARANCE RATES ######
+### Connect and Load Database ####
+
+cons.police <- dbConnect(drv=RSQLite::SQLite(), dbname="O:/AllUsers/CovStat/Data Portal/repository/Data/Database Files/Police.db")
+cleareance <- dbGetQuery(cons.police, 'select * from ClearanceRates')
+
+
+#Load Update File
+#Change in format of data
+update  <-  read.csv(file="NEWFormat_January17.csv", header=FALSE, na.strings = "NA", stringsAsFactors = FALSE)
+update <- data.frame(update, ind=rep(1:2, nrow(update)/2))
+updateV1 <- unstack(update, V1~ind)
+updateV2 <- unstack(update, V2~ind)
+update <- do.call("cbind", list(updateV1, updateV2))
+names(update)[1] <- "Charge.Code"
+names(update)[2] <- "Count"
+names(update)[3] <- "Charge"
+names(update)[4] <- "C_rate"
+update <- update[c("C_rate", "Count", "Charge", "Charge.Code")]
+update$Month <- "January"
+update$Year <- "2017"
+update$Date <- "01/31/2017"
+
+
+#January15  <-  read.csv(file="January15.csv", header=FALSE, na.strings = "NA", stringsAsFactors = FALSE)
+#January15 <- data.frame(January15, ind=rep(1:4, nrow(January15)/4))
+#January15 <- unstack(January15, V1~ind)
+#names(January15) <- c("C_rate", "Count", "Charge", "Charge.Code")
+#January15$Month <- "January"
+#January15$Year <- "2015"
+#January15$Date <- "01/31/2015"
+
+
+
+
+
+dbWriteTable(cons.police, "ClearanceRates", combined, overwrite = TRUE)
+dbDisconnect(cons.police)
+
+
+
+
+
+
+
+
+
+
+
+
+
 January15  <-  read.csv(file="January15.csv", header=FALSE, na.strings = "NA", stringsAsFactors = FALSE)
 January15 <- data.frame(January15, ind=rep(1:4, nrow(January15)/4))
 January15 <- unstack(January15, V1~ind)
@@ -227,10 +276,25 @@ November16$Month <- "November"
 November16$Year <- "2016"
 November16$Date <- "11/30/2016"
 
-combined <- do.call("rbind", list(combined, October16, November16))
+#Change in format of data
+December16  <-  read.csv(file="NEWFormat_December16.csv", header=FALSE, na.strings = "NA", stringsAsFactors = FALSE)
+December16 <- data.frame(December16, ind=rep(1:2, nrow(December16)/2))
+December16V1 <- unstack(December16, V1~ind)
+December16V2 <- unstack(December16, V2~ind)
+December16 <- do.call("cbind", list(December16V1, December16V2))
+names(December16)[1] <- "Charge.Code"
+names(December16)[2] <- "Count"
+names(December16)[3] <- "Charge"
+names(December16)[4] <- "C_rate"
+December16 <- December16[c("C_rate", "Count", "Charge", "Charge.Code")]
+December16$Month <- "December"
+December16$Year <- "2016"
+December16$Date <- "12/31/2016"
+
+combined <- do.call("rbind", list(combined, October16, November16, December16))
 
 
-#If 'Quantity' is not the number of crimes than work backwards using percent cleared and quanity of crimes cleared to get number of crimes
+#If 'Quantity' is not the number of crimes than work backwards using percent cleared and quantity of crimes cleared to get number of crimes
 #Will need to change to numeric class, trim % symbol, create new column showing percent as ratio (Eg. 85% to .85), and perfrom calculation to get number of crimes
 combined$C_rate <- substr(combined$C_rate,1, nchar(combined$C_rate)-1)
 combined$C_rate <- as.numeric(combined$C_rate)
@@ -267,14 +331,9 @@ save(combined, file="U:/CityWide Performance/Police/Part I & Part II/ClearanceRa
 
 ######################################
 ###  Connect and write to SQLite  ###
-#system("rm test4.db")
 
-police <- dbDriver("SQLite")
-cons.police <- dbConnect(police, dbname="O:/AllUsers/CovStat/Data Portal/repository/Data/Database Files/Police.db")
 
-dbWriteTable(cons.police, "ClearanceRates", combined, overwrite = TRUE)
 
-dbDisconnect(cons.police)
 
 
 
