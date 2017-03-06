@@ -27,12 +27,12 @@ police.runs  <- read.csv("MONTHLY_UPDATE.csv",  header=TRUE,  stringsAsFactors =
 
 ## Add some data for the update and format dates
 police.runs <- within(police.runs, {
-  Year <- '2017'
-  Count <- 1
+
   CreateDateTime <- strptime(CreateDateTime, format = "%m/%d/%Y %H:%M")
   
 })
-
+police.runs$Year <- '2017'
+police.runs$Count <- 1
 ##Edit names of columns
 names(police.runs) <- c("IncidentNumber", "Date", "Incident.Type", "Address", "Lat", "Long", "Year",  "Count")
 
@@ -155,55 +155,89 @@ police.runs <- subset(police.runs,  Category != "do not include")
 
 #############################################
 ####Neighborhood Assignment Current Update###
+##  have to load file in ArcGIS             ##
 #############################################
-write.csv(police.runs, file="C:/Users/tsink/Mapping/Geocoding/Police/PoliceUpdates.csv", row.names = FALSE)
 
-#####################
-##Connect to ArcGIS##
-#####################
+####Add zero to NAs in Lat and -360 in Lon ----
+for (i in 1:length(police.runs$Lat)){
+  if(is.na(police.runs$Lat[i]) | police.runs$Lat[i] == -361)
+    police.runs$Lat[i] <- 0
+}
+for (i in 1:length(police.runs$Long)){
+  if(is.na(police.runs$Long[i]) | police.runs$Long[i] == -361)
+    police.runs$Long[i] <- 0
+}
 
-#### Initialize arcgisbinding ####
-arc.check_product()
+#### Send to ArcGIS ####
+send_arcgis <- function(dataframe, path, layerName){
+  coordinates(dataframe) <- ~Long+Lat
+  ## Define Coordinate system for spatial points data.frame 
+  reference <- CRS("+init=epsg:4326")
+  proj4string(dataframe) <- reference
+  ## Assign closest neighborhood and sector in ArcGIS
+  writeOGR(obj = dataframe, dsn = path, layer = layerName, driver = 'ESRI Shapefile', overwrite_layer = TRUE)
+}
+send_arcgis(police.runs, "C:/Users/tsink/Mapping/Geocoding/Police", "PoliceUpdate")
 
-#### Read GIS Features ####
-readGIS<- arc.open("C:/Users/tsink/Mapping/Geocoding/Police/RunsNeighborhoods_Sectors.shp")
 
-#### Create Data.Frame ####
-policeGIS <- arc.select(readGIS)
+#### Receive from ArcGIS ####
+receive_arcgis <- function(fromPath, dataframeName) {
+  arc.check_product()
+  ## Read GIS Features 
+  read <- arc.open(fromPath)
+  ## Create Data.Frame from GIS data 
+  dataframeName <- arc.select(read)
+  ## Bind hidden lat/long coordinates back to data frame 
+  shape <- arc.shape(dataframeName)
+  dataframeName<- data.frame(dataframeName, long=shape$x, lat=shape$y)
+}
+policeGIS <- receive_arcgis("C:/Users/tsink/Mapping/Geocoding/Police/RunsNeighborhoods_Sectors.shp", policeGIS)
 
-#bind hidden lat/long coordinates back to data frame
-#shape <- arc.shape(policeGIS)
-#policeGIS<- data.frame(policeGIS, long=shape$x, lat=shape$y)
+#policeGIS <- plyr::rename(policeGIS, c("Count"="Year", "Year"="Count"))
+#### Mutual Aid ####
+# Assign First Mutual Aid ------
+policeGIS$NbhdLabel[policeGIS$Distance > 0] <- "Mutual Aid"
 
-policeGIS <- policeGIS[, c(-1:-2, -14:-17, -19:-31, -34:-36)] 
+# Assign Closest Neighborhood for polices in downtown sector but outside of neighborhod boundary -----
+policeGIS$NbhdLabel <- ifelse(policeGIS$Distance_1 == 0 & policeGIS$NbhdLabel == "Mutual Aid", as.character(policeGIS$NEIGHBORHO),
+                              as.character(policeGIS$NbhdLabel))
+
+# Assign Mutual Aid to police sector -----
+policeGIS$BEAT[policeGIS$Distance_1 > 0] <- 0
+
+# If call is inside neighborhood but outside sector -----
+policeGIS$NbhdLabel <- ifelse(policeGIS$Distance == 0 & policeGIS$Distance_1 > 0, "Mutual Aid",
+                              as.character(policeGIS$NbhdLabel))
+
+##Invalid coordinates and neighborhood indication
+policeGIS$NbhdLabel[policeGIS$lat == 0] <- "Invalid Coordinates"
+policeGIS$BEAT[policeGIS$lat == 0] <- 99
+
+
+policeGIS <- policeGIS[, c(-1:-2, -12:-15, -17:-29, -32:-34)] 
+policeGIS <- policeGIS[, c(1:5, 14:13, 6:12)]
 names(policeGIS) <- c("Field1", "IncidentNu", "Date", "Incident Type", "Address", "Lat", "Long",
                       "Year", "Count", "Category", "GunReported", "NbhdLabel", "ID_1", "BEAT")
 
-#########################
-####  SQLite storage ####
-#########################
+#### Write Files ####
 library("RSQLite")
 cons.police <- dbConnect(drv=RSQLite::SQLite(), dbname="O:/AllUsers/CovStat/Data Portal/repository/Data/Database Files/Police.db")
-dbWriteTable(cons.police, "PoliceRuns", policeGIS, overwrite = TRUE)
+dbWriteTable(cons.police, "PoliceRuns", policeGIS, append = TRUE)
+
+## Tableau Dashboard. Pull all files and refresh excluding 2013 ---------------------------
+alltables <- dbListTables(cons.police)
+dash_runs <- dbGetQuery(cons.police, 'select * from PoliceRuns')
+dash_runs <- subset(dash_runs, Year != 2013)
+write.csv(dash_runs, "U:/CityWide Performance/CovStat/CovStat Projects/Police/Tableau Files/PoliceRuns.csv")
 dbDisconnect(cons.police)
 
 ### CovStat Repository ---------------------------
-write.csv(policeGIS, file="O:/AllUsers/CovStat/Data Portal/Repository/Data/Police/Police Runs.csv")
-
-## Tableau Dashboard -----------------------------
-dash_runs <- subset(policeGIS, Year != 2013)
-write.csv(dash_runs, "U:/CityWide Performance/CovStat/CovStat Projects/Police/Tableau Files/PoliceRuns.csv")
-
-
-## Load from SQLite ------------------------------
-#alltables <- dbListTables(cons.police)
-#police_history <- dbGetQuery(cons.police, 'select * from PoliceRuns')
-#police_history <- strptime(police_history$Date, format = "%m/%d/%Y %I:%M %p")
+write.csv(dash_runs, file="O:/AllUsers/CovStat/Data Portal/Repository/Data/Police/Police Runs.csv")
 
 #########################################################
 ##Reload and output for OpenGov Map showing repat calls##
 #########################################################
-police.map <- police.runs
+
 #police.map$Date <- gsub(" \\d*[[:punct:]]*\\d*", "", police.map$Date)
 ##Split Date and Time into separate columns
 police.map <- cSplit(police.map, "Date", sep = " ", type.convert = character)
